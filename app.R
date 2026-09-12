@@ -186,8 +186,14 @@ server <- function(input, output, session) {
     df <- tryCatch(
       withProgress(message = "正在读取数据文件", value = 0, {
         incProgress(0.15, detail = "检查文件格式……")
-        extension <- tolower(tools::file_ext(input$file$name))
-        separator <- if (extension == "csv") "," else ""
+        first_line <- readLines(input$file$datapath, n = 1, warn = FALSE)
+        separator <- if (grepl(",", first_line, fixed = TRUE)) {
+          ","
+        } else if (grepl("\t", first_line, fixed = TRUE)) {
+          "\t"
+        } else {
+          ""
+        }
 
         result <- read.table(
           input$file$datapath,
@@ -212,8 +218,14 @@ server <- function(input, output, session) {
     )
 
     validate(need(!is.null(df), "无法读取该文件，请根据左侧提示检查文件格式。"))
-    validate(need(nrow(df) > 0 && ncol(df) > 0, "文件中没有可用的数据。"))
-    validate(need("TIME" %in% names(df), "文件缺少 TIME 列，无法进行时间分析。"))
+    if (nrow(df) == 0 || ncol(df) == 0) {
+      file_status(list(type = "danger", message = "文件中没有可用的数据。"))
+      validate(need(FALSE, "文件中没有可用的数据。"))
+    }
+    if (!"TIME" %in% names(df)) {
+      file_status(list(type = "danger", message = "文件缺少 TIME 列。请确认文件表头和分隔格式是否正确。"))
+      validate(need(FALSE, "文件缺少 TIME 列，无法进行时间分析。"))
+    }
 
     # 数值列中少量空白或非法字符转换为 NA，避免整列被误判成文本
     converted_invalid <- 0L
