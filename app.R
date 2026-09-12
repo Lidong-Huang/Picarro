@@ -121,7 +121,12 @@ ui <- fluidPage(
       transform: rotate(30deg);
     }
   ")), 
-      actionButton("calc_segments", "计算时间段平均值")
+      actionButton("calc_segments", "计算时间段平均值"),
+      downloadButton(
+        "download_segments",
+        "下载分析结果（CSV）",
+        style = "margin-top: 10px; color: white; background-color: #3498db; border-radius: 8px;"
+      )
     ),
     mainPanel(
       plotlyOutput("xy_plot", height = "500px")  
@@ -137,7 +142,7 @@ ui <- fluidPage(
       bottom: 0;
       width: 100%;
     ",
-    HTML("&copy; 2025 资源环境学院 黄利东. 版权所有")
+    HTML("&copy; 2026 资源环境学院 黄利东. 版权所有")
   )
 )
 
@@ -240,13 +245,38 @@ server <- function(input, output, session) {
         x_time = as.POSIXct("1970-01-01", tz = "UTC") + as.numeric(x)
       )
     
+    # TIME 作为横轴时，从当前起始时间开始按样品间隔自动绘制标记线
+    marker_times <- if (input$x_var == "TIME") {
+      seq(
+        from = min(df1$x_time),
+        to = max(df1$x_time),
+        by = input$interval_minutes * 60
+      )
+    } else {
+      NULL
+    }
+    marker_shapes <- if (length(marker_times) > 0) {
+      lapply(marker_times, function(marker_time) {
+        list(
+          type = "line",
+          xref = "x", yref = "paper",
+          x0 = marker_time, x1 = marker_time,
+          y0 = 0, y1 = 1,
+          line = list(color = "red", width = 1.5, dash = "dash")
+        )
+      })
+    } else {
+      list()
+    }
+
     plot_ly(data = df1, x = ~x_time, y = ~y,
             type = "scatter", mode = "lines+markers", source = "sub_plot") %>%
       layout(
         title = paste(input$y_var, "vs", input$x_var),
         xaxis = list(title = input$x_var),
         yaxis = list(title = input$y_var),
-        dragmode = "select"
+        dragmode = "select",
+        shapes = marker_shapes
       )
      
   })
@@ -296,7 +326,7 @@ observeEvent(input$calc_segments, {
     mutate(
       segment_id = as.integer(difftime(TIME, min(TIME), units = "secs")) %/% (input$interval_minutes * 60)
       )
-  
+
   result <- df %>%
     group_by(segment_id) %>%
     mutate(row_id = row_number(), 
@@ -326,6 +356,18 @@ observeEvent(input$calc_segments, {
    df$segment_id <- as.integer(df$segment_id)
    df
    })
+
+ output$download_segments <- downloadHandler(
+   filename = function() {
+     paste0("picarro_analysis_", format(Sys.Date(), "%Y%m%d"), ".csv")
+   },
+   content = function(file) {
+     req(processed_segments())
+     df <- processed_segments()
+     df$segment_id <- as.integer(df$segment_id) + 1L
+     write.csv(df, file, row.names = FALSE, fileEncoding = "UTF-8")
+   }
+ )
 }
 
 shinyApp(ui = ui, server = server)
