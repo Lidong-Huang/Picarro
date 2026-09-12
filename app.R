@@ -338,10 +338,21 @@ server <- function(input, output, session) {
     }
     file_status(list(type = status_type, message = paste(status_messages, collapse = " ")))
 
-    updateSelectInput(session, "x_var", choices = names(df), selected = if ("TIME" %in% names(df)) "TIME")
+    # 按 Picarro 文件的固定列顺序设置默认项：第 2 列为 TIME，第 26 列为 CO2
+    x_default <- if (ncol(df) >= 2) names(df)[2] else names(df)[1]
+    y_default_by_position <- if (ncol(df) >= 26) names(df)[26] else NULL
+
+    updateSelectInput(session, "x_var", choices = names(df), selected = x_default)
     numeric_columns <- names(df)[vapply(df, is.numeric, logical(1))]
     y_choices <- setdiff(numeric_columns, "TIME")
-    updateSelectInput(session, "y_var", choices = y_choices)
+    y_default <- if (!is.null(y_default_by_position) && y_default_by_position %in% y_choices) {
+      y_default_by_position
+    } else if (length(y_choices) > 0) {
+      y_choices[1]
+    } else {
+      character(0)
+    }
+    updateSelectInput(session, "y_var", choices = y_choices, selected = y_default)
     
     df <- df[!duplicated(df$TIME), ]
     df
