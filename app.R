@@ -4,6 +4,9 @@ library(readr)
 library(dplyr)
 library(hms)
 
+# Shiny 默认上传限制较小；允许上传最大 500 MB 的仪器数据文件
+options(shiny.maxRequestSize = 500 * 1024^2)
+
 ui <- fluidPage(
   # 在head中添加CSS样式
   tags$head(
