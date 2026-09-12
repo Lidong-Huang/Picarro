@@ -38,6 +38,23 @@ ui <- fluidPage(
       #video_help_btn i {
         font-size: 16px;
       }
+      #analysis_help_btn {
+        position: fixed;
+        right: 24px;
+        bottom: 62px;
+        z-index: 999;
+        color: white;
+        background: #e74c3c;
+        border: 2px solid white;
+        border-radius: 24px;
+        padding: 9px 16px;
+        font-weight: bold;
+        box-shadow: 0 4px 14px rgba(231, 76, 60, 0.45);
+      }
+      #analysis_help_btn:hover {
+        color: white;
+        background: #c0392b;
+      }
     "))
   ),
   
@@ -46,6 +63,8 @@ ui <- fluidPage(
       icon("play-circle"), 
       span("视频教程"),
       onclick = "window.open('https://www.bilibili.com/video/BV1bhE4zQEKx/?vd_source=97bb2a54115f0ffa99be6857cdb781f8',  '_blank')"), 
+
+  actionButton("analysis_help_btn", tagList(icon("info-circle"), "分析原理")),
   
   tags$head(HTML("<title>Picarro数据处理系统</title>")),
   titlePanel(
@@ -153,6 +172,44 @@ ui <- fluidPage(
 server <- function(input, output, session) {
 
   file_status <- reactiveVal(NULL)
+
+  session$onFlushed(function() {
+    showModal(modalDialog(
+      title = tagList(icon("exclamation-triangle"), "分析前请注意"),
+      tags$p(
+        "仪器出峰可能存在延迟。即使起始时间和样品间隔固定，也请确认峰值平台已被软件的分段范围正确覆盖。"
+      ),
+      footer = actionButton(
+        "confirm_delay_notice",
+        "我已了解，继续使用",
+        class = "btn-primary"
+      ),
+      easyClose = FALSE,
+      fade = TRUE
+    ))
+  }, once = TRUE)
+
+  observeEvent(input$confirm_delay_notice, {
+    removeModal()
+  })
+
+  observeEvent(input$analysis_help_btn, {
+    showModal(modalDialog(
+      title = tagList(icon("info-circle"), "分析原理"),
+      tags$p("软件从设定的起始时间开始，按照样品间隔划分时间段，红色虚线表示各段边界。"),
+      tags$p("每个时间段取中间部分的数据计算平均值，以尽量避开切换过程中的波动。"),
+      tags$div(
+        class = "alert alert-warning",
+        icon("exclamation-triangle"),
+        tags$span(
+          style = "margin-left: 6px;",
+          "仪器响应可能延迟，请结合曲线检查峰值平台是否位于有效计算区间内。"
+        )
+      ),
+      footer = modalButton("关闭"),
+      easyClose = TRUE
+    ))
+  })
 
   output$file_status <- renderUI({
     status <- file_status()
